@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Semantic Interface Test</title>
+		<style>
+			.zone {
+				position: absolute;
+				border: 1px solid #ccc;
+				background-color: rgba(200, 200, 200, 0.1);
+			}
+			.menu-zone {
+				top: 0;
+				left: 0;
+				width: 100%;
+				height: 50px;
+			}
+			.sidebar-zone {
+				top: 50px;
+				left: 0;
+				width: 200px;
+				height: calc(100vh - 50px);
+			}
+			.content-zone {
+				top: 50px;
+				left: 200px;
+				width: calc(100vw - 200px);
+				height: calc(100vh - 50px);
+			}
+			#performance-display {
+				position: fixed;
+				bottom: 10px;
+				right: 10px;
+				background: rgba(0, 0, 0, 0.8);
+				color: white;
+				padding: 10px;
+				border-radius: 5px;
+				font-family: monospace;
+			}
+			.click-marker {
+				position: absolute;
+				width: 10px;
+				height: 10px;
+				background: red;
+				border-radius: 50%;
+				transform: translate(-50%, -50%);
+				pointer-events: none;
+				opacity: 0.5;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="zones">
+			<div class="zone menu-zone" data-zone="menu"></div>
+			<div class="zone sidebar-zone" data-zone="sidebar"></div>
+			<div class="zone content-zone" data-zone="content"></div>
+		</div>
+		<div id="performance-display">
+			Traditional: 0ms<br />
+			Semantic: 0ms
+		</div>
+		<script>
+			class TraditionalProcessor {
+				constructor() {
+					this.elements = new Map();
+				}
+
+				processClick(x, y) {
+					const start = performance.now();
+
+					// Simulate traditional processing steps
+					const binaryX = x.toString(2).padStart(16, "0");
+					const binaryY = y.toString(2).padStart(16, "0");
+
+					// Parse coordinates back
+					const parsedX = parseInt(binaryX, 2);
+					const parsedY = parseInt(binaryY, 2);
+
+					// Element lookup (simulate DOM traversal)
+					const elements = document.elementsFromPoint(x, y);
+					const targetElement = elements.find((el) =>
+						el.classList.contains("zone")
+					);
+
+					if (targetElement) {
+						const zoneName = targetElement.dataset.zone;
+						// Simulate action determination
+						const action = `click_${zoneName}`;
+					}
+
+					return performance.now() - start;
+				}
+			}
+
+			class SemanticProcessor {
+				constructor() {
+					this.zones = new Map();
+					document.querySelectorAll(".zone").forEach((zone) => {
+						const rect = zone.getBoundingClientRect();
+						this.zones.set(zone.dataset.zone, {
+							top: rect.top,
+							left: rect.left,
+							right: rect.right,
+							bottom: rect.bottom,
+						});
+					});
+				}
+
+				processClick(x, y) {
+					const start = performance.now();
+
+					// Direct pattern matching
+					for (const [zoneName, bounds] of this.zones) {
+						if (
+							x >= bounds.left &&
+							x <= bounds.right &&
+							y >= bounds.top &&
+							y <= bounds.bottom
+						) {
+							// Direct action execution
+							const action = `action_${zoneName}`;
+							break;
+						}
+					}
+
+					return performance.now() - start;
+				}
+			}
+
+			// Initialize processors
+			const traditional = new TraditionalProcessor();
+			const semantic = new SemanticProcessor();
+			const display = document.getElementById("performance-display");
+
+			// Click handling
+			let clickCount = 0;
+			const clicks = [];
+
+			document.addEventListener("click", (e) => {
+				// Create click marker
+				const marker = document.createElement("div");
+				marker.className = "click-marker";
+				marker.style.left = e.pageX + "px";
+				marker.style.top = e.pageY + "px";
+				document.body.appendChild(marker);
+
+				// Process click with both methods
+				const traditionalTime = traditional.processClick(
+					e.pageX,
+					e.pageY
+				);
+				const semanticTime = semantic.processClick(e.pageX, e.pageY);
+
+				// Store results
+				clicks.push({
+					x: e.pageX,
+					y: e.pageY,
+					traditionalTime,
+					semanticTime,
+				});
+
+				// Update display
+				const avgTraditional =
+					clicks.reduce((sum, c) => sum + c.traditionalTime, 0) /
+					clicks.length;
+				const avgSemantic =
+					clicks.reduce((sum, c) => sum + c.semanticTime, 0) /
+					clicks.length;
+
+				display.innerHTML = `
+                Traditional: ${avgTraditional.toFixed(3)}ms<br>
+                Semantic: ${avgSemantic.toFixed(3)}ms<br>
+                Clicks: ${clicks.length}<br>
+                Improvement: ${(
+					((avgTraditional - avgSemantic) / avgTraditional) *
+					100
+				).toFixed(1)}%
+            `;
+
+				// Remove old markers after a delay
+				setTimeout(() => marker.remove(), 1000);
+			});
+
+			// Handle window resize
+			window.addEventListener("resize", () => {
+				semantic.zones.clear();
+				document.querySelectorAll(".zone").forEach((zone) => {
+					const rect = zone.getBoundingClientRect();
+					semantic.zones.set(zone.dataset.zone, {
+						top: rect.top,
+						left: rect.left,
+						right: rect.right,
+						bottom: rect.bottom,
+					});
+				});
+			});
+		</script>
+	</body>
+</html>
